@@ -21,7 +21,15 @@ class CSVProcessor:
         quantity_col = column_mapping.get('quantity') 
         price_col = column_mapping.get('price')
         
-        variant_size = clean_and_format_data(row.get(variant_col) if variant_col else '', '50ml')
+        # Better variant size handling
+        variant_size = clean_and_format_data(row.get(variant_col) if variant_col else '', '50')
+        
+        # If variant_size is just a number, assume it's ml
+        if variant_size.isdigit():
+            variant_display = f"{variant_size}ml"
+        else:
+            variant_display = variant_size
+        
         quantity = int(row.get(quantity_col, 1)) if quantity_col and pd.notna(row.get(quantity_col)) else 1
         price = clean_and_format_data(row.get(price_col) if price_col else '', '0.00')
         
@@ -31,8 +39,8 @@ class CSVProcessor:
         sku = f"{file_prefix}-{title_prefix}-{variant_size}"
         
         variant_data = {
-            'title': f"{variant_size}ml" if variant_size.replace('.', '').isdigit() else variant_size,
-            'price': str(price) if price != '' else '0.00',
+            'title': variant_display,  # "2ml" instead of just "2"
+            'price': str(price),
             'sku': sku,
             'inventory_quantity': quantity,
             'weight': Config.DEFAULT_WEIGHT,
@@ -43,13 +51,11 @@ class CSVProcessor:
             'taxable': True
         }
         
-        # Handle tax settings
-        tax_col = column_mapping.get('tax')
-        if tax_col and pd.notna(row.get(tax_col)):
-            variant_data['taxable'] = str(row[tax_col]).upper() == 'TRUE'
+        logger.info(f"🏷️ Created variant: {variant_display} with {quantity} pieces at ${price}")
         
         variants.append(variant_data)
         return variants
+
 
     def prepare_product_data(self, row, column_mapping, filename):
         """Convert CSV row to Shopify product format"""
@@ -105,8 +111,95 @@ class CSVProcessor:
             # Read CSV file
             df = pd.read_csv(csv_file_path)
             logger.info(f"📊 Found {len(df)} rows in {filename}")
+            logger.info(f"📋 CSV columns: {list(df.columns)}")
             
-            # Filter out invalid rows (comments
+            # Filter out invalid rows
+            original_count = len(df)
+            df = df[df['TITLE'].notna()]
+            df = df[~df['TITLE'].astype(str).str.startswith('#')]
+            df = df[df['TITLE'].astype(str).str.strip() != '']
+            
+            filtered_count = len(df)
+            if filtered_count < original_count:
+                logger.info(f"🧹 Filtered out {original_count - filtered_count} invalid rows")
+            
+            if filtered_count == 0:
+                logger.error(f"⚠️ No valid products found in {filename} after filtering")
+                return None
+            
+            logger.info(f"📊 Processing {filtered_count} valid products from {filename}")
+            
+            # Detect CSV structure
+            try:
+                column_mapping = self.column_mapper.detect_csv_structure(df, filename)
+                logger.info(f"✅ Column mapping successful: {column_mapping}")
+            except Exception as e:
+                logger.error(f"❌ Column mapping failed: {str(e)}")
+                return None
+            
+            # Process products
+            processed_products = []
+            title_col = column_mapping['title']
+            
+            try:
+                grouped = df.groupby(title_col)
+                logger.info(f"📊 Found {len(grouped)} unique product titles")
+            except Exception as e:
+                logger.error(f"❌ Groupby operation failed: {str(e)}")
+                return None
+            
+            for title, group in grouped:
+                logger.info(f"🔄 Processing product: {title}")
+                
+                try:
+                    # Skip invalid titles
+                    if not title or str(title).strip().startswith('#'):
+                        logger.warning(f"⚠️ Skipping invalid title: {title}")
+                        continue
+                    
+                    # Handle multiple variants
+                    if len(group) > 1:
+                        logger.info(f"📦 Multiple variants found for {title}: {len(group)}")
+                        base_row = group.iloc[0].copy()
+                        quantity_col = column_mapping.get('quantity')
+                        if quantity_col:
+                            total_pieces = group[quantity_col].sum()
+                            base_row[quantity_col] = total_pieces
+                            logger.info(f"📊 Combined quantity: {total_pieces}")
+                        product_data = self.prepare_product_data(base_row, column_mapping, filename)
+                    else:
+                        logger.info(f"📦 Single variant for {title}")
+                        product_data = self.prepare_product_data(group.iloc[0], column_mapping, filename)
+                    
+                    if product_data:
+                        processed_products.append(product_data)
+                        logger.info(f"✅ Successfully processed: {title}")
+                    else:
+                        logger.error(f"❌ Failed to prepare product data for: {title}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error processing {title}: {str(e)}")
+                    import traceback
+                    logger.error(f"📋 Full traceback: {traceback.format_exc()}")
+                    continue
+            
+            if not processed_products:
+                logger.error(f"❌ No products were successfully processed from {filename}")
+                return None
+            
+            result = {
+                'filename': filename,
+                'products': processed_products,
+                'column_mapping': column_mapping,
+                'total_rows': len(df)
+            }
+            
+            logger.info(f"🎉 Successfully processed {len(processed_products)} products from {filename}")
+            return result
+            
         except Exception as e:
-            logger.error(f"Error processing file {filename}: {e}")
-            return []
+            logger.error(f"❌ Critical error processing CSV file {filename}: {str(e)}")
+            import traceback
+            logger.error(f"📋 Full traceback: {traceback.format_exc()}")
+            return None
+
