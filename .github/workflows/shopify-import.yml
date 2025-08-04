@@ -70,8 +70,16 @@ jobs:
         python-version: '3.9'
         cache: 'pip'
         
-    - name: Install dependencies
-      run: pip install -r requirements.txt
+    - name: Install compatible dependencies
+      run: |
+        pip install --upgrade pip
+        pip install numpy==1.26.4
+        pip install pandas==2.2.3
+        pip install -r requirements.txt
+        
+    - name: Verify installation
+      run: |
+        python -c "import numpy; import pandas; print(f'NumPy: {numpy.__version__}, Pandas: {pandas.__version__}')"
         
     - name: Run import script
       env:
