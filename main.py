@@ -92,7 +92,7 @@ def main():
         shopify_importer.print_summary()
         
         # Exit with error if any products failed
-        if shopify_importer.overall_results['failed_products'] > 0:
+        if shopify_importer.overall_results.get('failed', 0) > 0:
             logger.warning("⚠️  Some products failed to import")
             sys.exit(1)
             

@@ -126,7 +126,7 @@ class ShopifyImporter:
         logger.info("SHOPIFY IMPORT SUMMARY")
         for key in ("created", "updated", "failed"):
             logger.info(f"{key.capitalize():>10}: {self.stats[key]}")
-        logger.info("────────────────────────────────")
+        logger.info("────────────────────────────────") 
 
     # ─────────────────────────  cleanup  ───────────────────────────────
     def cleanup(self):
