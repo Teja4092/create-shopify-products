@@ -86,7 +86,7 @@ jobs:
       env:
         SHOPIFY_SHOP_DOMAIN: ${{ secrets.SHOPIFY_SHOP_DOMAIN }}
         SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
-        SHOPIFY_API_VERSION: "2023-10"  # NOT a secret - regular env var
+        SHOPIFY_API_VERSION: "2024-01"  # NOT a secret - regular env var
         CHANGED_FILES: ${{ needs.detect-changed-files.outputs.changed-files }}
       run: |
         echo "🚀 Starting import with files: $CHANGED_FILES"
