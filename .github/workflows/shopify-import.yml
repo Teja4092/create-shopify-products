@@ -31,27 +31,57 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 2
+        fetch-depth: 2  # Need at least 2 commits to detect changes
 
     - name: Detect changed CSV files
       id: changes
       run: |
+        echo "🔍 Detecting changed files..."
+        
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "📝 Manual trigger detected"
+          
           if [ "${{ github.event.inputs.process_all }}" = "true" ]; then
-            echo "changed-files=$(find ${{ github.event.inputs.folder_path }} -name '*.csv' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            echo "🗂️ Processing all CSV files"
+            FOUND_FILES=$(find ${{ github.event.inputs.folder_path }} -name '*.csv' 2>/dev/null || echo "")
           elif [ -n "${{ github.event.inputs.specific_file }}" ]; then
-            echo "changed-files=${{ github.event.inputs.specific_file }}" >> $GITHUB_OUTPUT
+            echo "📄 Processing specific file: ${{ github.event.inputs.specific_file }}"
+            FOUND_FILES="${{ github.event.inputs.specific_file }}"
           else
-            echo "changed-files=$(find ${{ github.event.inputs.folder_path }} -name '*.csv' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            echo "🗂️ Processing all CSV files in folder"
+            FOUND_FILES=$(find ${{ github.event.inputs.folder_path }} -name '*.csv' 2>/dev/null || echo "")
           fi
-          echo "has-changes=true" >> $GITHUB_OUTPUT
+          
+          if [ -n "$FOUND_FILES" ]; then
+            echo "changed-files=$FOUND_FILES" >> $GITHUB_OUTPUT
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Found files: $FOUND_FILES"
+          else
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No CSV files found"
+          fi
+          
         else
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep -E '\.csv$' | grep '^product-data/' || true)
+          echo "🔄 Push trigger detected"
+          
+          # For push events, detect changed files
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # First push to branch
+            echo "🆕 First push to branch - processing all CSV files"
+            CHANGED_FILES=$(find product-data -name '*.csv' 2>/dev/null || echo "")
+          else
+            # Regular push - detect changed files
+            echo "📋 Detecting changed files between commits"
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.csv$' | grep '^product-data/' || echo "")
+          fi
+          
           if [ -n "$CHANGED_FILES" ]; then
             echo "changed-files=$CHANGED_FILES" >> $GITHUB_OUTPUT
             echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Changed CSV files detected: $CHANGED_FILES"
           else
             echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No CSV files changed"
           fi
         fi
 
@@ -77,9 +107,19 @@ jobs:
         pip install pandas==2.2.3
         pip install -r requirements.txt
         
-    - name: Verify installation
+    - name: Verify detected files
       run: |
-        python -c "import numpy; import pandas; print(f'NumPy: {numpy.__version__}, Pandas: {pandas.__version__}')"
+        echo "🔍 Files to process: ${{ needs.detect-changed-files.outputs.changed-files }}"
+        
+        # Convert to array and check each file exists
+        FILES="${{ needs.detect-changed-files.outputs.changed-files }}"
+        for file in $FILES; do
+          if [ -f "$file" ]; then
+            echo "✅ Found: $file"
+          else
+            echo "❌ Missing: $file"
+          fi
+        done
         
     - name: Run import script
       env:
@@ -87,7 +127,9 @@ jobs:
         SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
         SHOPIFY_API_VERSION: ${{ secrets.SHOPIFY_API_VERSION }}
         CHANGED_FILES: ${{ needs.detect-changed-files.outputs.changed-files }}
-      run: python main.py
+      run: |
+        echo "🚀 Starting import with files: $CHANGED_FILES"
+        python main.py
       
     - name: Upload import results
       if: always()
