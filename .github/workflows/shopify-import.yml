@@ -1,0 +1,91 @@
+name: Import Products from Multiple CSV Files
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'product-data/**/*.csv'
+  workflow_dispatch:
+    inputs:
+      folder_path:
+        description: 'Folder path to process CSV files'
+        required: true
+        default: 'product-data'
+      specific_file:
+        description: 'Specific CSV file to process (optional)'
+        required: false
+        default: ''
+      process_all:
+        description: 'Process all CSV files in folder'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  detect-changed-files:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-files: ${{ steps.changes.outputs.changed-files }}
+      has-changes: ${{ steps.changes.outputs.has-changes }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Detect changed CSV files
+      id: changes
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event.inputs.process_all }}" = "true" ]; then
+            echo "changed-files=$(find ${{ github.event.inputs.folder_path }} -name '*.csv' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.inputs.specific_file }}" ]; then
+            echo "changed-files=${{ github.event.inputs.specific_file }}" >> $GITHUB_OUTPUT
+          else
+            echo "changed-files=$(find ${{ github.event.inputs.folder_path }} -name '*.csv' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          fi
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+        else
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep -E '\.csv$' | grep '^product-data/' || true)
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "changed-files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+  import-products:
+    needs: detect-changed-files
+    if: needs.detect-changed-files.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+        
+    - name: Run import script
+      env:
+        SHOPIFY_SHOP_DOMAIN: ${{ secrets.SHOPIFY_SHOP_DOMAIN }}
+        SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
+        SHOPIFY_API_VERSION: ${{ secrets.SHOPIFY_API_VERSION }}
+        CHANGED_FILES: ${{ needs.detect-changed-files.outputs.changed-files }}
+      run: python main.py
+      
+    - name: Upload import results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: import-results-${{ github.run_number }}
+        path: |
+          logs/*.log
+          product-data/**/*.csv
