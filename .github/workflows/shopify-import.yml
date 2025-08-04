@@ -3,8 +3,8 @@ name: Import Products from Multiple CSV Files
 on:
   push:
     branches: [ main ]
-    paths: 
-      - 'product-data/**/*.csv'
+    # paths: 
+    #   - 'product-data/**/*.csv'
   workflow_dispatch:
     inputs:
       folder_path:
