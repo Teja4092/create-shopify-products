@@ -10,51 +10,13 @@ class ShopifyImporter:
     
     def __init__(self):
         Config.validate_required_settings()
-        
-        # List of API versions to try (newest first)
-        api_versions_to_try = [
-            Config.SHOPIFY_API_VERSION,
-            "2024-01",
-            "2023-07", 
-            "2023-04",
-            "2023-01"
-        ]
-        
-        self.session = None
-        
-        for api_version in api_versions_to_try:
-            if not api_version or api_version in ['***', '']:
-                continue
-                
-            # Clean the API version string
-            api_version = str(api_version).strip()
-            
-            try:
-                logger.info(f"🔧 Attempting to connect with API version: {api_version}")
-                self.session = shopify.Session(
-                    Config.SHOPIFY_SHOP_DOMAIN, 
-                    api_version, 
-                    Config.SHOPIFY_ACCESS_TOKEN
-                )
-                shopify.ShopifyResource.activate_session(self.session)
-                logger.info(f"✅ Connected to Shopify store: {Config.SHOPIFY_SHOP_DOMAIN} (API v{api_version})")
-                break
-                
-            except shopify.api_version.VersionNotFoundError:
-                logger.warning(f"⚠️ API version {api_version} not supported, trying next...")
-                continue
-            except Exception as e:
-                logger.error(f"❌ Connection failed with API version {api_version}: {str(e)}")
-                continue
-        
-        if not self.session:
-            try:
-                supported_versions = list(shopify.ApiVersion.versions.keys())
-                logger.error(f"❌ No supported API version found!")
-                logger.error(f"📋 Available versions in your ShopifyAPI library: {supported_versions}")
-            except:
-                logger.error("❌ Could not determine supported API versions")
-            raise ValueError("Unable to establish Shopify connection with any supported API version")
+        self.session = shopify.Session(
+            Config.SHOPIFY_SHOP_DOMAIN, 
+            Config.SHOPIFY_API_VERSION, 
+            Config.SHOPIFY_ACCESS_TOKEN
+        )
+        shopify.ShopifyResource.activate_session(self.session)
+        logger.info(f"✅ Connected to Shopify store: {Config.SHOPIFY_SHOP_DOMAIN}")
         
         self.overall_results = {
             'files_processed': 0,
@@ -82,10 +44,48 @@ class ShopifyImporter:
                 logger.info(f"⚠️  Product already exists: {title} (from {filename})")
                 return {'success': True, 'action': 'skipped', 'title': title, 'file': filename}
 
+            # Create new product
             product = shopify.Product()
-            for key, value in product_data.items():
-                setattr(product, key, value)
+            
+            # Set basic product attributes (not variants or images)
+            basic_attributes = ['title', 'body_html', 'vendor', 'product_type', 'tags', 'status']
+            for key in basic_attributes:
+                if key in product_data:
+                    setattr(product, key, product_data[key])
+            
+            # Handle variants separately - convert dicts to Shopify Variant objects
+            if 'variants' in product_data and product_data['variants']:
+                shopify_variants = []
+                for variant_data in product_data['variants']:
+                    variant = shopify.Variant()
+                    for key, value in variant_data.items():
+                        if hasattr(variant, key):
+                            setattr(variant, key, value)
+                    shopify_variants.append(variant)
+                product.variants = shopify_variants
+            
+            # Handle images separately - convert dicts to Shopify Image objects
+            if 'images' in product_data and product_data['images']:
+                shopify_images = []
+                for image_data in product_data['images']:
+                    if isinstance(image_data, dict) and 'src' in image_data:
+                        image = shopify.Image()
+                        image.src = image_data['src']
+                        shopify_images.append(image)
+                product.images = shopify_images
+            
+            # Handle options separately
+            if 'options' in product_data and product_data['options']:
+                shopify_options = []
+                for option_data in product_data['options']:
+                    option = shopify.Option()
+                    for key, value in option_data.items():
+                        if hasattr(option, key):
+                            setattr(option, key, value)
+                    shopify_options.append(option)
+                product.options = shopify_options
 
+            # Save the product
             success = product.save()
             
             if success:
@@ -96,7 +96,7 @@ class ShopifyImporter:
                     'product_id': product.id, 
                     'title': title,
                     'file': filename,
-                    'variants_count': len(product_data['variants'])
+                    'variants_count': len(product_data.get('variants', []))
                 }
             else:
                 error_msg = f"API Error: {product.errors.full_messages()}"
@@ -108,15 +108,14 @@ class ShopifyImporter:
             logger.error(f"❌ Error with {title} from {filename}: {error_msg}")
             return {'success': False, 'error': error_msg, 'title': title, 'file': filename}
 
+
     def import_products(self, processed_data, delay=None):
-        """Import processed products to Shopify - THIS METHOD WAS MISSING"""
+        """Import processed products to Shopify"""
         if delay is None:
             delay = Config.DEFAULT_DELAY
             
         filename = processed_data['filename']
         products = processed_data['products']
-        
-        logger.info(f"🚀 Starting import for {filename} with {len(products)} products")
         
         file_results = {
             'filename': filename,
@@ -127,7 +126,6 @@ class ShopifyImporter:
         }
         
         for product_data in products:
-            logger.info(f"🔄 Processing product: {product_data['title']}")
             result = self.create_product(product_data, filename)
             
             if result['success']:
@@ -141,14 +139,11 @@ class ShopifyImporter:
                 file_results['failed'].append(result)
                 self.overall_results['failed_products'] += 1
             
-            # Add delay to avoid rate limiting
             time.sleep(delay)
         
         self.overall_results['files_processed'] += 1
         self.overall_results['total_products'] += processed_data['total_rows']
         self.overall_results['file_results'].append(file_results)
-        
-        logger.info(f"📊 Completed {filename}: {len(file_results['created'])} created, {len(file_results['skipped'])} skipped, {len(file_results['failed'])} failed")
         
         return file_results
 
@@ -177,8 +172,5 @@ class ShopifyImporter:
 
     def cleanup(self):
         """Clean up Shopify session"""
-        try:
-            shopify.ShopifyResource.clear_session()
-            logger.info("✅ Session cleaned up")
-        except Exception as e:
-            logger.warning(f"⚠️ Warning during cleanup: {e}")
+        shopify.ShopifyResource.clear_session()
+        logger.info("✅ Session cleaned up")
