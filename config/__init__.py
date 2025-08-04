@@ -13,7 +13,7 @@ except ImportError as e:
     class Config:
         SHOPIFY_SHOP_DOMAIN = os.getenv('SHOPIFY_SHOP_DOMAIN')
         SHOPIFY_ACCESS_TOKEN = os.getenv('SHOPIFY_ACCESS_TOKEN')
-        SHOPIFY_API_VERSION = os.getenv('SHOPIFY_API_VERSION', '2023-10')
+        SHOPIFY_API_VERSION = os.getenv('SHOPIFY_API_VERSION', '2024-01')
         DEFAULT_DELAY = 1.0
         DEFAULT_WEIGHT = 0.5
         DEFAULT_WEIGHT_UNIT = 'kg'
