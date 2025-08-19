@@ -101,6 +101,7 @@ class ShopifyImporter:
                 v.option1 = v_src['option1']
             if 'option2' in v_src:
                 v.option2 = v_src['option2']
+            logger.info(f"Variant {v.sku}: inventory_management={getattr(v, 'inventory_management', None)}")
             product.variants.append(v)
 
         # images – optional
