@@ -48,7 +48,7 @@ class CSVProcessor:
                     'inventory_quantity': quantity,
                     'weight': Config.DEFAULT_WEIGHT,
                     'weight_unit': Config.DEFAULT_WEIGHT_UNIT,
-                    'inventory_management': 'shopify',
+                    'inventory_management': 'shopify',  # Always force this
                     'inventory_policy': Config.DEFAULT_INVENTORY_POLICY,
                     'requires_shipping': True,
                     'taxable': True
@@ -77,7 +77,7 @@ class CSVProcessor:
                         'inventory_quantity': quantity,
                         'weight': Config.DEFAULT_WEIGHT,
                         'weight_unit': Config.DEFAULT_WEIGHT_UNIT,
-                        'inventory_management': 'shopify',
+                        'inventory_management': 'shopify',  # Always force this
                         'inventory_policy': Config.DEFAULT_INVENTORY_POLICY,
                         'requires_shipping': True,
                         'taxable': True
@@ -106,7 +106,7 @@ class CSVProcessor:
                 'inventory_quantity': quantity,
                 'weight': Config.DEFAULT_WEIGHT,
                 'weight_unit': Config.DEFAULT_WEIGHT_UNIT,
-                'inventory_management': 'shopify',
+                'inventory_management': 'shopify',  # Always force this
                 'inventory_policy': Config.DEFAULT_INVENTORY_POLICY,
                 'requires_shipping': True,
                 'taxable': True
