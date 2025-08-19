@@ -17,47 +17,97 @@ class CSVProcessor:
     #  PARSE VARIANTS  (price fix added)
     # ────────────────────────────────────────────────────────────
     def parse_variants_from_row(self, row, column_mapping, filename):
+        # Support for multiple option values (comma-separated)
+        option1_name = row.get('Option1 Name')
+        option1_values = [v.strip() for v in str(row.get('Option1 Value', '')).split(',') if v.strip()]
+        option2_name = row.get('Option2 Name')
+        option2_values = [v.strip() for v in str(row.get('Option2 Value', '')).split(',') if v.strip()]
+        price_col    = column_mapping.get('price')
+        quantity_col = column_mapping.get('quantity')
         variants = []
 
-        variant_col  = column_mapping.get('variants')
-        quantity_col = column_mapping.get('quantity')
-        price_col    = column_mapping.get('price')
-
-        # Variant-size
-        variant_size_raw = clean_and_format_data(row.get(variant_col) if variant_col else '', '50')
-        variant_display  = f"{variant_size_raw}ml" if variant_size_raw.isdigit() else variant_size_raw
-
-        # Quantity
-        quantity = int(row.get(quantity_col, 1)) if quantity_col and pd.notna(row.get(quantity_col)) else 1
-
-        # ─── PRICE 2-decimal formatting (✅ fix) ─────────────────
-        price_raw = clean_and_format_data(row.get(price_col) if price_col else '', '0')
-        try:
-            price_float = float(price_raw)
-        except ValueError:
-            price_float = 0.0
-        price_formatted = f"{price_float:.2f}"       # always “100.00”
-
-        # SKU
-        file_prefix  = Path(filename).stem.replace('-', '').replace('_', '').upper()[:3]
-        title_prefix = row[column_mapping['title']].replace(' ', '-').replace("'", "").upper()[:10]
-        sku          = f"{file_prefix}-{title_prefix}-{variant_size_raw}"
-
-        variant_data = {
-            'title'              : variant_display,
-            'price'              : price_formatted,
-            'sku'                : sku,
-            'inventory_quantity' : quantity,
-            'weight'             : Config.DEFAULT_WEIGHT,
-            'weight_unit'        : Config.DEFAULT_WEIGHT_UNIT,
-            'inventory_management': 'shopify',
-            'inventory_policy'   : Config.DEFAULT_INVENTORY_POLICY,
-            'requires_shipping'  : True,
-            'taxable'            : True
-        }
-
-        variants.append(variant_data)
-        logger.info(f"🏷️ Created variant: {variant_display} with {quantity} pieces at ${price_formatted}")
+        # If only option1 is present
+        if option1_name and option1_values and not option2_name:
+            for val in option1_values:
+                price_raw = clean_and_format_data(row.get(price_col) if price_col else '', '0')
+                try:
+                    price_float = float(price_raw)
+                except ValueError:
+                    price_float = 0.0
+                price_formatted = f"{price_float:.2f}"
+                quantity = int(row.get(quantity_col, 1)) if quantity_col and pd.notna(row.get(quantity_col)) else 1
+                file_prefix  = Path(filename).stem.replace('-', '').replace('_', '').upper()[:3]
+                title_prefix = row[column_mapping['title']].replace(' ', '-').replace("'", "").upper()[:10]
+                sku          = f"{file_prefix}-{title_prefix}-{val}"
+                variant_data = {
+                    'title': val,
+                    'price': price_formatted,
+                    'sku': sku,
+                    'inventory_quantity': quantity,
+                    'weight': Config.DEFAULT_WEIGHT,
+                    'weight_unit': Config.DEFAULT_WEIGHT_UNIT,
+                    'inventory_management': 'shopify',
+                    'inventory_policy': Config.DEFAULT_INVENTORY_POLICY,
+                    'requires_shipping': True,
+                    'taxable': True
+                }
+                variants.append(variant_data)
+        # If both option1 and option2 are present (cross product)
+        elif option1_name and option1_values and option2_name and option2_values:
+            for val1 in option1_values:
+                for val2 in option2_values:
+                    price_raw = clean_and_format_data(row.get(price_col) if price_col else '', '0')
+                    try:
+                        price_float = float(price_raw)
+                    except ValueError:
+                        price_float = 0.0
+                    price_formatted = f"{price_float:.2f}"
+                    quantity = int(row.get(quantity_col, 1)) if quantity_col and pd.notna(row.get(quantity_col)) else 1
+                    file_prefix  = Path(filename).stem.replace('-', '').replace('_', '').upper()[:3]
+                    title_prefix = row[column_mapping['title']].replace(' ', '-').replace("'", "").upper()[:10]
+                    sku          = f"{file_prefix}-{title_prefix}-{val1}-{val2}"
+                    variant_data = {
+                        'title': f"{val1} / {val2}",
+                        'price': price_formatted,
+                        'sku': sku,
+                        'inventory_quantity': quantity,
+                        'weight': Config.DEFAULT_WEIGHT,
+                        'weight_unit': Config.DEFAULT_WEIGHT_UNIT,
+                        'inventory_management': 'shopify',
+                        'inventory_policy': Config.DEFAULT_INVENTORY_POLICY,
+                        'requires_shipping': True,
+                        'taxable': True
+                    }
+                    variants.append(variant_data)
+        else:
+            # fallback to original logic
+            variant_col  = column_mapping.get('variants')
+            variant_size_raw = clean_and_format_data(row.get(variant_col) if variant_col else '', '50')
+            variant_display  = f"{variant_size_raw}ml" if variant_size_raw.isdigit() else variant_size_raw
+            quantity = int(row.get(quantity_col, 1)) if quantity_col and pd.notna(row.get(quantity_col)) else 1
+            price_raw = clean_and_format_data(row.get(price_col) if price_col else '', '0')
+            try:
+                price_float = float(price_raw)
+            except ValueError:
+                price_float = 0.0
+            price_formatted = f"{price_float:.2f}"
+            file_prefix  = Path(filename).stem.replace('-', '').replace('_', '').upper()[:3]
+            title_prefix = row[column_mapping['title']].replace(' ', '-').replace("'", "").upper()[:10]
+            sku          = f"{file_prefix}-{title_prefix}-{variant_size_raw}"
+            variant_data = {
+                'title': variant_display,
+                'price': price_formatted,
+                'sku': sku,
+                'inventory_quantity': quantity,
+                'weight': Config.DEFAULT_WEIGHT,
+                'weight_unit': Config.DEFAULT_WEIGHT_UNIT,
+                'inventory_management': 'shopify',
+                'inventory_policy': Config.DEFAULT_INVENTORY_POLICY,
+                'requires_shipping': True,
+                'taxable': True
+            }
+            variants.append(variant_data)
+        logger.info(f"🏷️ Created {len(variants)} variants for product {row[column_mapping['title']]}")
         return variants
 
     # ────────────────────────────────────────────────────────────
@@ -101,16 +151,16 @@ class CSVProcessor:
         # Variants
         variants = self.parse_variants_from_row(row, column_mapping, filename)
 
-        # Options (dynamic)
+        # Options (dynamic, support multiple values)
         options = []
         option1_name = row.get('Option1 Name')
-        option1_value = row.get('Option1 Value')
+        option1_values = [v.strip() for v in str(row.get('Option1 Value', '')).split(',') if v.strip()]
         option2_name = row.get('Option2 Name')
-        option2_value = row.get('Option2 Value')
-        if option1_name and option1_value:
-            options.append({'name': option1_name, 'values': [option1_value]})
-        if option2_name and option2_value:
-            options.append({'name': option2_name, 'values': [option2_value]})
+        option2_values = [v.strip() for v in str(row.get('Option2 Value', '')).split(',') if v.strip()]
+        if option1_name and option1_values:
+            options.append({'name': option1_name, 'values': option1_values})
+        if option2_name and option2_values:
+            options.append({'name': option2_name, 'values': option2_values})
 
         product_data = {
             'title'       : title,
