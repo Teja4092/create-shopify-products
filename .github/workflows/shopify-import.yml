@@ -2,9 +2,9 @@ name: Import Products from Multiple CSV Files
 
 on:
   push:
-    branches: [ main , feature/*]
-    # paths: 
-    #   - 'product-data/**/*.csv'
+    branches:
+      - main
+      - 'feature/**'
   workflow_dispatch:
     inputs:
       folder_path:
