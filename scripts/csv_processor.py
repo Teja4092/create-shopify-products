@@ -23,7 +23,8 @@ class CSVProcessor:
         option2_name = row.get('Option2 Name')
         option2_values = [v.strip() for v in str(row.get('Option2 Value', '')).split(',') if v.strip()]
         price_col    = column_mapping.get('price')
-        quantity_col = column_mapping.get('quantity')
+        # Use 'inventory_quantity' directly from the row
+        quantity_col = 'inventory_quantity'
         variants = []
 
         # If only option1 is present
