@@ -41,6 +41,7 @@ class CSVProcessor:
                 sku          = f"{file_prefix}-{title_prefix}-{val}"
                 variant_data = {
                     'title': val,
+                    'option1': val,
                     'price': price_formatted,
                     'sku': sku,
                     'inventory_quantity': quantity,
@@ -68,6 +69,8 @@ class CSVProcessor:
                     sku          = f"{file_prefix}-{title_prefix}-{val1}-{val2}"
                     variant_data = {
                         'title': f"{val1} / {val2}",
+                        'option1': val1,
+                        'option2': val2,
                         'price': price_formatted,
                         'sku': sku,
                         'inventory_quantity': quantity,
@@ -96,6 +99,7 @@ class CSVProcessor:
             sku          = f"{file_prefix}-{title_prefix}-{variant_size_raw}"
             variant_data = {
                 'title': variant_display,
+                'option1': variant_display,
                 'price': price_formatted,
                 'sku': sku,
                 'inventory_quantity': quantity,
