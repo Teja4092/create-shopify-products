@@ -74,6 +74,14 @@ class ShopifyImporter:
         for fld in ("title", "body_html", "vendor", "product_type", "tags"):
             setattr(product, fld, pdata.get(fld, ""))
 
+        # handle (optional)
+        if "handle" in pdata and pdata["handle"]:
+            product.handle = pdata["handle"]
+
+        # product_category (optional)
+        if "product_category" in pdata and pdata["product_category"]:
+            product.product_category = pdata["product_category"]
+
         # always leave in Draft
         product.status = "draft"
 
@@ -97,6 +105,15 @@ class ShopifyImporter:
             img = shopify.Image()
             img.src = img_src["src"]
             product.images.append(img)
+
+        # options – set from pdata if present
+        if "options" in pdata and pdata["options"]:
+            product.options = []
+            for opt in pdata["options"]:
+                option = shopify.Option()
+                option.name = opt["name"]
+                option.values = opt["values"]
+                product.options.append(option)
 
         # save to Shopify
         if product.save():

@@ -1,5 +1,5 @@
-TITLE,Description,Price,Option1 Name,Option1 Value,Option2 Value,NO.OF PIECES,TAGS,Vendor,Category
+TITLE,Description,Price,Option1 Name,Option1 Value,Option2 Value,NO.OF PIECES,TAGS,Vendor,Category,Handle,Product Category
 L'Homme YSL EDT,"Experience the timeless elegance of L'Homme Yves Saint Laurent EDT.
 A rich blend of rare notes crafted for sophistication.
 Unleash bold charisma with every captivating spray.
-Perfect for those who demand distinction and allure.",100,Size,50ML,100ML,2,"L'HommeYSLedt , YSL",Kenzo,Perfumes and colognes
+Perfect for those who demand distinction and allure.",100,Size,50ML,100ML,2,"L'HommeYSLedt , YSL",Kenzo,Perfumes and colognes,lhomme-ysl-edt,Perfumes and colognes

@@ -73,6 +73,17 @@ class CSVProcessor:
             f"<p>{title} - Imported from {Path(filename).stem}</p>"
         )
 
+        # Handle (optional)
+        handle = row.get('Handle')
+        if not handle:
+            # fallback: generate from title
+            handle = title.lower().replace(' ', '-').replace("'", "")
+
+        # Product Category (optional)
+        product_category = row.get('Product Category')
+        if not product_category:
+            product_category = row.get(column_mapping.get('category')) if column_mapping.get('category') else ''
+
         # Tags
         tags_col = column_mapping.get('tags')
         tags     = clean_and_format_data(row.get(tags_col) if tags_col else '', 'imported')
@@ -90,16 +101,29 @@ class CSVProcessor:
         # Variants
         variants = self.parse_variants_from_row(row, column_mapping, filename)
 
+        # Options (dynamic)
+        options = []
+        option1_name = row.get('Option1 Name')
+        option1_value = row.get('Option1 Value')
+        option2_name = row.get('Option2 Name')
+        option2_value = row.get('Option2 Value')
+        if option1_name and option1_value:
+            options.append({'name': option1_name, 'values': [option1_value]})
+        if option2_name and option2_value:
+            options.append({'name': option2_name, 'values': [option2_value]})
+
         product_data = {
             'title'       : title,
+            'handle'      : handle,
             'body_html'   : description,
             'vendor'      : clean_and_format_data(row.get(column_mapping.get('vendor')) if column_mapping.get('vendor') else '', 'Default Vendor'),
             'product_type': clean_and_format_data(row.get(column_mapping.get('category')) if column_mapping.get('category') else '', 'General'),
+            'product_category': product_category,
             'tags'        : tags,
             'status'      : 'draft',                # ← CREATED AS DRAFT
             'variants'    : variants,
             'images'      : images,
-            'options'     : [{'name': 'Size', 'values': [v['title'] for v in variants]}] if len(variants) > 1 else []
+            'options'     : options
         }
         return product_data
 
