@@ -97,6 +97,10 @@ class ShopifyImporter:
             ):
                 if k in v_src:
                     setattr(v, k, v_src[k])
+            if 'option1' in v_src:
+                v.option1 = v_src['option1']
+            if 'option2' in v_src:
+                v.option2 = v_src['option2']
             product.variants.append(v)
 
         # images – optional
