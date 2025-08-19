@@ -126,6 +126,25 @@ class ShopifyImporter:
                 f"✅ {action.capitalize()} product: {title} (ID {product.id}) "
                 f"from {src_file}"
             )
+            # Set inventory at 'Parfum Gallerie' location
+            try:
+                # Get all locations
+                locations = shopify.Location.find()
+                parfum_location = next((loc for loc in locations if 'parfum' in loc.name.lower()), None)
+                if not parfum_location:
+                    logger.warning("❌ 'Parfum Gallerie' location not found. Inventory not set.")
+                else:
+                    location_id = parfum_location.id
+                    for v, v_src in zip(product.variants, pdata["variants"]):
+                        if hasattr(v, 'inventory_item_id') and 'inventory_quantity' in v_src:
+                            shopify.InventoryLevel.set(
+                                location_id=location_id,
+                                inventory_item_id=v.inventory_item_id,
+                                available=int(v_src['inventory_quantity'])
+                            )
+                            logger.info(f"✅ Set inventory for variant {v.sku} at Parfum Gallerie: {v_src['inventory_quantity']}")
+            except Exception as e:
+                logger.error(f"❌ Error setting inventory at Parfum Gallerie: {e}")
         else:
             self.stats["failed"] += 1
             logger.error(
