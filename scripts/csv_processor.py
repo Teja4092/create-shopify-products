@@ -206,9 +206,38 @@ class CSVProcessor:
             logger.info(f"✅ Column mapping successful: {column_mapping}")
 
             processed_products = []
-            for title, group in df.groupby(column_mapping['title']):
-                row = group.iloc[0]
-                processed_products.append(self.prepare_product_data(row, column_mapping, filename))
+            for handle, group in df.groupby('Handle'):
+                # Build variants from all rows in the group
+                variants = []
+                option1_name = None
+                option1_values = set()
+                option2_name = None
+                option2_values = set()
+                for _, row in group.iterrows():
+                    # Use parse_variants_from_row to build variant dict for each row
+                    v = self.parse_variants_from_row(row, column_mapping, filename)
+                    if v:
+                        variants.extend(v)
+                    # Collect option values
+                    if row.get('Option1 Name'):
+                        option1_name = row.get('Option1 Name')
+                        option1_values.add(str(row.get('Option1 Value')).strip())
+                    if row.get('Option2 Name') and pd.notna(row.get('Option2 Value')):
+                        option2_name = row.get('Option2 Name')
+                        option2_values.add(str(row.get('Option2 Value')).strip())
+                # Use the first row for shared product fields
+                first_row = group.iloc[0]
+                # Build options list
+                options = []
+                if option1_name and option1_values:
+                    options.append({'name': option1_name, 'values': sorted(option1_values)})
+                if option2_name and option2_values:
+                    options.append({'name': option2_name, 'values': sorted(option2_values)})
+                # Build product data
+                product_data = self.prepare_product_data(first_row, column_mapping, filename)
+                product_data['variants'] = variants
+                product_data['options'] = options
+                processed_products.append(product_data)
 
             logger.info(f"🎉 Successfully processed {len(processed_products)} products from {filename}")
 
